@@ -5,6 +5,7 @@ import openWebSocket from 'open-websocket'
 
 const endpoints = {
   base: 'wss://stream.binance.com:9443/ws',
+  stream: 'wss://stream.binance.com:9443/stream',
   futures: 'wss://fstream.binance.com/ws',
 }
 
@@ -93,7 +94,7 @@ const partialDepth = (payload, cb, transform = true, variator) => {
         transform
           ? variator === 'futures'
             ? futuresPartDepthTransform(level, obj)
-            : partialDepthTransform(symbol, level, obj)
+            : partialDepthTransform(symbolName, level, obj)
           : obj,
       )
     }
@@ -103,6 +104,35 @@ const partialDepth = (payload, cb, transform = true, variator) => {
 
   return options =>
     cache.forEach(w => w.close(1000, 'Close handle was called', { keepClosed: true, ...options }))
+}
+
+const partialDepthStream = (payload, cb, transform = true) => {
+  const streamValue = (Array.isArray(payload) ? payload : [payload]).map(({ symbol, level }) => {
+    const [symbolName, updateSpeed] = symbol.toLowerCase().split('@');
+    return `${symbolName}@depth${level}${updateSpeed ? `@${updateSpeed}` : ''}`;
+  }).join('/');
+
+  const url = endpoints.stream + '?streams=' + streamValue;
+  const w = openWebSocket(url);
+  const levelExp = new RegExp(/@depth(\d{1,10})/);
+  const symbolExp = new RegExp(/^(.*?)@/);
+
+  w.onmessage = msg => {
+    const obj = JSON.parse(msg.data);
+
+    if (transform) {
+      const stream = obj.stream;
+      const levelMatches = levelExp.exec(stream);
+      const symbolMatches = symbolExp.exec(stream);
+      const level = levelMatches && levelMatches.length ? Number(levelMatches[1]) : null;
+      const symbol = symbolMatches && symbolMatches.length ? symbolMatches[1] : null;
+      cb(partialDepthTransform(symbol, level, obj.data));
+    } else {
+      cb(obj);
+    }
+  };
+
+  return options => w.close(1000, 'Close handle was called', { keepClosed: true, ...options });
 }
 
 const candles = (payload, interval, cb, transform = true, variator) => {
@@ -709,6 +739,7 @@ export default opts => {
   return {
     depth,
     partialDepth,
+    partialDepthStream,
     candles,
     trades,
     aggTrades,

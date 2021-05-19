@@ -230,6 +230,15 @@ test('[WS] partial depth with update speed', t => {
   })
 })
 
+test('[WS] partial depth stream', t => {
+  return new Promise(resolve => {
+    client.ws.partialDepthStream([{ symbol: 'ETHBTC@100ms', level: 10 }, { symbol: 'ETHUSDT', level: 20 }, { symbol: 'ETHUSDT' }], depth => {
+      checkFields(t, depth, ['symbol', 'level', 'lastUpdateId', 'bids', 'asks']);
+      resolve()
+    })
+  })
+})
+
 test('[WS] ticker', t => {
   return new Promise(resolve => {
     client.ws.ticker('ETHBTC', ticker => {
