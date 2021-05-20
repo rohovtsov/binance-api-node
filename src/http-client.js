@@ -102,6 +102,17 @@ const checkParams = (name, payload, requires = []) => {
   return true
 }
 
+const wrapHeaders = (headers, keepAlive = false) => {
+  if (keepAlive) {
+    return {
+      ...(headers ? headers : {}),
+      'Connection': 'keep-alive'
+    }
+  }
+
+  return headers;
+};
+
 /**
  * Make public calls against the api
  *
@@ -111,7 +122,7 @@ const checkParams = (name, payload, requires = []) => {
  * @param {object} headers
  * @returns {object} The api response
  */
-const publicCall = ({ endpoints }) => (path, data, method = 'GET', headers = {}) =>
+const publicCall = ({ endpoints, keepAlive }) => (path, data, method = 'GET', headers = {}) =>
   sendResult(
     fetch(
       `${!(path.includes('/fapi') || path.includes('/futures')) ? endpoints.base : endpoints.futures}${path}${makeQueryString(
@@ -120,7 +131,7 @@ const publicCall = ({ endpoints }) => (path, data, method = 'GET', headers = {})
       {
         method,
         json: true,
-        headers,
+        headers: wrapHeaders(headers, keepAlive),
       },
     ),
   )
@@ -152,7 +163,7 @@ const keyCall = ({ apiKey, pubCall }) => (path, data, method = 'GET') => {
  * @param {object} headers
  * @returns {object} The api response
  */
-const privateCall = ({ apiKey, apiSecret, endpoints, getTime = defaultGetTime, pubCall }) => (
+const privateCall = ({ apiKey, apiSecret, endpoints, getTime = defaultGetTime, pubCall, keepAlive }) => (
   path,
   data = {},
   method = 'GET',
@@ -185,7 +196,7 @@ const privateCall = ({ apiKey, apiSecret, endpoints, getTime = defaultGetTime, p
         }`,
         {
           method,
-          headers: { 'X-MBX-APIKEY': apiKey },
+          headers: wrapHeaders({ 'X-MBX-APIKEY': apiKey }, keepAlive),
           json: true,
         },
       ),
